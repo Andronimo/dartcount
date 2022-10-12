@@ -1,6 +1,7 @@
 from tkinter import *
 from askFrame import AskFrame
 import platform
+import dartConstants
 
 KEYCODES = {
   90: 0,
@@ -22,8 +23,6 @@ class MenuFrame(Frame):
         return KEYCODES[keycode]
 
     def cb(self, e):
-        
-        #print(e.keycode)
 
         self.root.unbind("<KeyPress>")
         self.place_forget()  
@@ -36,9 +35,6 @@ class MenuFrame(Frame):
 
         if platform.system() == "Windows":
             number = e.keycode - 96
-        print(number)
-        #print(self.answers)
-#        print(self.answers[number])
 
         if number >= 0 and number <= 9:
             self.userCb(self.answers[number])
@@ -80,7 +76,7 @@ class MenuFrame(Frame):
 
                 while len(text) < 3:
                     text = " {}".format(text)
-                label = Label(self, borderwidth=2, relief="groove", bg="#fff3bf", text="{}: {}".format(numpad[i], text), font = ("Helvetica", 30))
+                label = Label(self, borderwidth=2, relief="groove", bg="#fff3bf", text="{}: {}".format(numpad[i], text), font = (dartConstants.DART_FONT, 30))
                 label.grid(column=i%3, row=int(i/3), sticky="nesw")
             
             root.bind("<KeyPress>", lambda e:self.cb(e))

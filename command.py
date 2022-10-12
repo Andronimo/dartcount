@@ -14,8 +14,6 @@ class Command():
     def callback(self, event):
         if event.keysym == "KP_Divide":
             self.cmdType = "special"
-
-        print (event.keysym)
-
+            
         if event.keysym == "KP_Left":
             return "BackSpace"

@@ -59,6 +59,24 @@ class Leg:
 
         return True
 
+    def getLastScore(self):
+        lastPlayer = (self.currentPlayer + self.nPlayers - 1) % self.nPlayers
+        return self.points[lastPlayer][len(self.points[lastPlayer])-1]
+
+    def removeLastScore(self):
+        lastPlayer = (self.currentPlayer + self.nPlayers - 1) % self.nPlayers
+        self.points[lastPlayer].pop()
+        self.nextPlayer()
+
+    def removeScore(self, position):
+        rows = len(self.points[position[0]])
+        if position[1] < rows - 1:
+            self.points[position[0]][position[1]] = 0
+        elif position[1] == rows - 1:
+            self.points[position[0]].pop()
+
+        self.nextPlayer()
+
     def addNewScore(self, player, row, score):
 
         if len(self.points[player]) > row:

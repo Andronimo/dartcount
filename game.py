@@ -12,7 +12,7 @@ class Player:
 
 class Game:
     def __init__(
-        self, players, nSets=3, nLegs=3, options=dartConstants.DOUBLE_OUT, points=501
+        self, players, nSets=100, nLegs=3, options=dartConstants.DOUBLE_OUT, points=501
     ):
         self.nLegs = nLegs
         self.winPoints = points

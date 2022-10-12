@@ -1,0 +1,19 @@
+#!/bin/bash
+
+FILE="/home/pi/dartcount/saveCounter"
+if test -f "$FILE"; then
+  num=$(cat $FILE)
+
+  if (( num > 10 )); then
+    echo 0 > $FILE
+    killall python3
+    nohup /home/pi/startGui >/dev/null 2>&1 &
+    echo 1 > $FILE
+  else
+    if (( num > 0 )); then
+      echo $((num+1)) > $FILE
+    fi
+  fi
+else
+  echo 0 > $FILE
+fi

@@ -1,7 +1,7 @@
 from tkinter import *
 from random import *
 from textLabel import *
-import operator
+import dartConstants
 
 TEXTSIZE = 30
 
@@ -64,8 +64,6 @@ class ResultPane(Frame):
         self.changeGfLeg()
 
     def focus(self, set, leg):
-        #print("old: ",self.lastFocus[0] , " ", self.lastFocus[1])
-        #print("new: ",set , " ", leg)
         if len(self.labels) > set and len(self.labels[set]) > leg:
             self.labels[self.lastFocus[0]][self.lastFocus[1]].configure(bg="white")
             self.labels[set][leg].configure(bg=self.focusColor)
@@ -123,12 +121,12 @@ class ResultPane(Frame):
                 averageScore = StringVar(tmp)
                 averageScore.set('0.0')
 
-                #titLabel = Label(tmp, text=titles[col], fg="black", bg="white", font=("Helvetica",8))
-                titLabel = TextLabel(tmp, text=titles[col], height=14, font=("Helvetica",10), width=widths[col])
+                #titLabel = Label(tmp, text=titles[col], fg="black", bg="white", font=(dartConstants.DART_FONT,8))
+                titLabel = TextLabel(tmp, text=titles[col], height=14, font=(dartConstants.DART_FONT,10), width=widths[col])
                 titLabel.pack() #grid(row=0, column=0)
                 #tmp.grid_rowconfigure(0, weight = 1)
 
-                avgLabel = TextLabel(tmp, textVariable=averageScore, width=widths[col], text="0") #, textvariable=averageScore, fg="black", bg="white", font=("Helvetica",20))
+                avgLabel = TextLabel(tmp, textVariable=averageScore, width=widths[col], text="0") #, textvariable=averageScore, fg="black", bg="white", font=(dartConstants.DART_FONT,20))
                 avgLabel.pack() # grid(row=1, column=0)
                 #tmp.grid_rowconfigure(1, weight = 1)
 
@@ -143,9 +141,9 @@ class ResultPane(Frame):
         for player, score in enumerate(res):
             
             tmp.grid_rowconfigure(player, weight = 1)
-            nameLabel = Label(tmp, fg="black", bg="white",borderwidth=1, relief="solid", font=("Helvetica",TEXTSIZE), text=self.gf.game.players[player].name)
+            nameLabel = Label(tmp, fg="black", bg="white",borderwidth=1, relief="solid", font=(dartConstants.DART_FONT,TEXTSIZE), text=self.gf.game.players[player].name)
             nameLabel.grid(row=player, column=0, sticky="nesw")
-            allLabel = Label(tmp, fg="red", bg="#e8e8e8",borderwidth=1, relief="solid", font=("Helvetica",TEXTSIZE), text=score)
+            allLabel = Label(tmp, fg="red", bg="#e8e8e8",borderwidth=1, relief="solid", font=(dartConstants.DART_FONT,TEXTSIZE), text=score)
             allLabel.grid(row=player, column=1, sticky="nesw")
 
     def addSet(self, set, setCount, oar):
@@ -175,7 +173,7 @@ class ResultPane(Frame):
             for player in range(0,len(results)):
                 tmp.grid_rowconfigure(player,weight = 1)
 
-            label = Label(tmp, bg="white", font=("Helvetica",TEXTSIZE), text=text)
+            label = Label(tmp, bg="white", font=(dartConstants.DART_FONT,TEXTSIZE), text=text)
 
             label.grid(row=row, column=i, sticky="nesw")
             self.labels[setCount].append(label)     
@@ -184,5 +182,5 @@ class ResultPane(Frame):
             fg = "black"
             if player == winner:
                 fg = "red"
-            allLabel = Label(tmp, fg = fg, bg="white",borderwidth=1, relief="solid", font=("Helvetica",TEXTSIZE), text=results[player])
+            allLabel = Label(tmp, fg = fg, bg="white",borderwidth=1, relief="solid", font=(dartConstants.DART_FONT,TEXTSIZE), text=results[player])
             allLabel.grid(row=player, column=len(set.legs), sticky="nesw")

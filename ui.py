@@ -1,6 +1,6 @@
 from tkinter import *
 from game import Game
-from dartConstants import shortcuts
+import dartConstants
 from askFrame import AskFrame
 from menuFrame import MenuFrame
 from command import Command
@@ -12,6 +12,7 @@ from leg import Leg
 import os
 import pickle
 import platform
+from os.path import exists
 
 def onFrameConfigure(canvas):
     '''Reset the scroll region to encompass the inner frame'''
@@ -24,22 +25,20 @@ def scoreInput(gf, player, row, score, focus, checkDarts=0):
         return
 
     leg = gf.getCurrentLeg()
-
+    position = [player, row]
     wasFinished = leg.checkFinished()
 
-    if not leg.addNewScore(player, row, score):
-        return
-
-    save_object(gf.game, "autosave.dat");
+    if leg.addNewScore(player, row, score):
+        save_object(gf.game, "autosave.dat")
 
     gf.setScoreEntries()
 
     if (not wasFinished) and leg.checkFinished():
         if checkDarts > 0:
-            gf.endLeg(player, checkDarts)
+            gf.endLeg(player, checkDarts, position)
         else:
             root.focus_set()
-            AskFrame(["Checkdarts?"], root, lambda d:gf.endLeg(player, d[0])) 
+            AskFrame(["Checkdarts?"], root, lambda d:gf.endLeg(player, d[0], position)) 
     else:
         gf.scores(player)
 
@@ -47,13 +46,12 @@ def scoreInput(gf, player, row, score, focus, checkDarts=0):
             gf.setCurrentFocus(row)
 
 def scoreInputFunc(gf, player, row, focus):
-    score = 1000
     gf.inputEntries[player][row].selection_clear()
     if True == gf.inputScores[player][row].get().isdigit():
         score = int(gf.inputScores[player][row].get())
 
-    if score != 1000:
-        scoreInput(gf, player, row, score, focus)   
+        if 0 <= score <= 180:
+            scoreInput(gf, player, row, score, focus)   
 
 def changeBeginRight(gf):
     gf.getCurrentLeg().changeBeginRight()
@@ -66,8 +64,6 @@ def make_keydown_lambda(gf, i, row):
     return lambda event: keydown(event.keysym, gf, i, row)
 
 def evaluateMenu(cmd, gf, player, row):
-    print(cmd)
-
     if cmd == "cancel":
         gf.inputEntries[player][row].focus_set()
     else:
@@ -84,8 +80,6 @@ def make_menu_lambda(menu, gf, player, row):
     return lambda event: showMenu(menu, gf, player, row)
 
 def keydown(cmd, gf, player, row):
-
-    #print(cmd)
 
     if cmd == "KP_Enter":
         scoreInputFunc(gf, player, row, True)
@@ -119,8 +113,8 @@ def keydown(cmd, gf, player, row):
             gf.inputEntries[player+1][row].focus_set()
             gf.inputEntries[player+1][row].selection_range(0, END)
 
-    if cmd in shortcuts:
-        scoreInput(gf, player, row, shortcuts[cmd], True) 
+    if cmd in dartConstants.shortcuts:
+        scoreInput(gf, player, row, dartConstants.shortcuts[cmd], True) 
     else:
         restScore = gf.game.getCurrentLeg().getRestScore(player,-1)
 
@@ -151,48 +145,91 @@ class GameFrame(Frame):
     def getCurrentSet(self):
         return self.game.getSet(self.currentSet)
 
-    def endLeg(self, player, checkDarts):
+    def endLeg(self, player, checkDarts, position):
         cDarts = checkDarts
 
         if isinstance(checkDarts, str):
             if checkDarts.isnumeric():
                 cDarts = int(checkDarts)
             else:
+                self.removeScore(position)
                 return
         
         if cDarts < 1 or cDarts > 3:
+            self.removeScore(position)
             return
 
-        self.game.getCurrentLeg().lastDarts[player] = 3 - cDarts
+        self.getCurrentLeg().lastDarts[player] = 3 - cDarts
         self.game.checkFinished(True)
         self.currentSet = len(self.game.sets) - 1
         self.currentLeg = len(self.game.sets[self.currentSet].legs) - 1
         self.canvas.yview_moveto(0)
-        self.setScoreEntries()
-        position = self.game.getCurrentPosition()
-        self.inputEntries[position[2]][position[3]].focus_set()
+        self.refreshView()
         self.scores(player)
         self.rp.grid_forget()
         self.rp.grid_remove()
         self.initGameHistory()
 
+    def removeScore(self, position):
+        self.getCurrentLeg().removeScore(position)
+        self.inputScores[position[0]][position[1]].set("")
+        self.restScores[position[0]][position[1]].set("")
+        self.refreshView()
+
+    def refreshView(self):
+        self.setScoreEntries()
+        pos = self.getCurrentLeg().getCurrentPosition()
+        self.setCurrentFocus(pos[1])
+
     def scrollToRow(self, row):
+        height = self.canvas.winfo_height()
+        heightEntry = self.inputEntries[0][0].winfo_height()
+
+        self.reset_scrollregion(0)
+
+        if height == 1:
+            height = 563        
+
         if row > 2:
-            self.canvas.yview_moveto((row - 3)  / (len(self.inputEntries[0])-1))
+            pos = ((row+1) * heightEntry - height) / (len(self.inputEntries[0]) * heightEntry)
+            
+            # print(row)
+            # print(height)
+            # print(pos)
+            # print(len(self.inputEntries[0]))
+            
+            self.canvas.yview_moveto(pos)
         else:
             self.canvas.yview_moveto(0)
 
+        while len(self.inputEntries[0]) < row+7:
+            self.addScoreTableRow()  
+
+    def grabFocus(self):
+        if self.doGrabFocus:
+            self.setCurrentFocus(0)
+            self.doGrabFocus = False
+
     def setCurrentFocus(self, row):
+        yes = 0
         position = self.getCurrentLeg().getCurrentPosition()
 
-        #print(position)
+        print(position)
 
-        if len(self.inputEntries[0]) < row+4:
+        while len(self.inputEntries[0]) < position[1]+4:
             self.addScoreTableRow()
+            yes += 1
         
-        self.scrollToRow(position[1])
+        self.setScoreEntries()
 
-        self.inputEntries[position[0]][position[1]].focus_set()
+        if position[0] < len(self.inputEntries):
+            if position[1] < len(self.inputEntries[position[0]]):
+                self.inputEntries[position[0]][position[1]].focus_set()
+
+        if yes > 1:
+            self.doGrabFocus = True
+        else:
+            self.scrollToRow(position[1])
 
     def scores(self, player):
         self.rp.setStats(player, 0, self.game.getScoreInRange(player, 180, 180))
@@ -253,10 +290,14 @@ class GameFrame(Frame):
         self.initStats()
 
         if self.getCurrentLeg().checkFinished():
-            self.endLeg(0,3)
+            self.endLeg(0,3,[0,0])
+
+        position = self.getCurrentLeg().getCurrentPosition()
+        while len(self.inputEntries[0]) < position[1]+4:
+            self.addScoreTableRow()
 
         self.setScoreEntries()
-        self.setCurrentFocus(0)
+        self.doGrabFocus = True
 
     def initArrays(self):
         for player in self.game.players:
@@ -275,12 +316,12 @@ class GameFrame(Frame):
             playerFrame = Frame(playerLabelFrame, borderwidth=2,relief="solid")
             playerFrame.grid(row=0, column=i, sticky="nesw")
 
-            playerNameLabel = TextLabel(playerFrame, bg=playerFrame.cget("bg") ,height=100, text=player.name, font=("Calibri", 80), mode=1)
+            playerNameLabel = TextLabel(playerFrame, bg=playerFrame.cget("bg") ,height=100, text=player.name, font=(dartConstants.DART_FONT, 80), mode=1)
             playerNameLabel.pack(side=LEFT, padx=5, expand=False)
 
             legResult = StringVar()
             legResult.set("0")
-            legResultLabel = TextLabel(playerFrame, bg=playerFrame.cget("bg"), textVariable=legResult, text="0", height=100, font=("Calibri", 80), mode=1)
+            legResultLabel = TextLabel(playerFrame, bg=playerFrame.cget("bg"), textVariable=legResult, text="0", height=100, font=(dartConstants.DART_FONT, 80), mode=1)
             legResultLabel.pack(side=RIGHT, padx=5, pady=5, expand=False)
             self.legResults.append(legResult)
 
@@ -290,6 +331,9 @@ class GameFrame(Frame):
 
         for player in range(len(self.game.players)):
             self.scores(player)
+
+    def reset_scrollregion(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def initScoreTable(self):
 
@@ -305,8 +349,9 @@ class GameFrame(Frame):
         self.canvas.pack(side="left", fill=BOTH, expand=True)
         self.canvas.create_window((4,4), window=self.scoreTableFrame, anchor="nw", tags="grid")
         self.canvas.bind("<Configure>", lambda event, canvas=self.canvas: onFrameConfigure(self.canvas))
+        self.scoreTableFrame.bind("<Configure>", self.reset_scrollregion)
 
-        for row in range(0,self.game.getCurrentLeg().getRows()+5):
+        for row in range(0,self.game.getCurrentLeg().getRows()+7):
             self.addScoreTableRow()
         
 
@@ -319,7 +364,7 @@ class GameFrame(Frame):
 
             command = Command(self.game, column)
             self.inputScores[column].append(StringVar())
-            entry = Entry(self.scoreTableFrame, validate="key", validatecommand=(root.register(command.validate()), '%P'), textvariable=self.inputScores[column][row], justify='center', font=("Helvetica", 80))
+            entry = Entry(self.scoreTableFrame, validate="key", validatecommand=(root.register(command.validate()), '%P'), textvariable=self.inputScores[column][row], justify='center', font=(dartConstants.DART_FONT, 80))
             entry.grid(row=row, column=(2*column), sticky="nesw")
             entry.igw = True
             entry.bind('<Return>', make_lambda(self, column, row, True))
@@ -333,7 +378,7 @@ class GameFrame(Frame):
             entry.bind("<Key-plus>", lambda e: changeBeginRight(self))
             self.inputEntries[column].append(entry)
             self.restScores[column].append(StringVar())
-            scoreEntry = Entry(self.scoreTableFrame, textvariable=self.restScores[column][row], justify='center', font=("Helvetica", 80))
+            scoreEntry = Entry(self.scoreTableFrame, textvariable=self.restScores[column][row], justify='center', font=(dartConstants.DART_FONT, 80))
             scoreEntry.grid(row=row, column=(2*column+1), sticky="nesw") 
             self.restEntries[column].append(scoreEntry) 
 
@@ -353,7 +398,7 @@ class GameFrame(Frame):
 
             bigScore = StringVar()
             bigScore.set(self.game.winPoints)
-            bigScoreLabel = TextLabel(bigScoreFrame, text=self.game.winPoints, textVariable=bigScore, font=("Calibri", 210), width=430, height=230, fixY=-6)
+            bigScoreLabel = TextLabel(bigScoreFrame, text=self.game.winPoints, textVariable=bigScore, font=(dartConstants.DART_FONT, 210), width=430, height=230, fixY=-6)
             bigScoreLabel.pack( anchor=CENTER)
             self.bigScores.append(bigScore)
             i += 1
@@ -374,22 +419,22 @@ class GameFrame(Frame):
             stats = ["Average (3)", "Average (9)", "Best Leg"]
 
             for statCount, stat in enumerate(stats):
-                label = Label(statsFrame, text='{}:'.format(stat), bg="white", font=("Helvetica", 20))
+                label = Label(statsFrame, text='{}:'.format(stat), bg="white", font=(dartConstants.DART_FONT, 20))
                 label.grid(row=statCount, column=0, sticky="w")
-                label2 = Label(statsFrame, width=2, bg="white", font=("Helvetica", 20))
+                label2 = Label(statsFrame, width=2, bg="white", font=(dartConstants.DART_FONT, 20))
                 label2.grid(row=statCount, column=1, sticky="w")
                 averageScore = StringVar()
                 averageScore.set('0.0'.format(stat))
-                avgLabel = Label(statsFrame, textvariable=averageScore, bg="white", font=("Helvetica", 20))
+                avgLabel = Label(statsFrame, textvariable=averageScore, bg="white", font=(dartConstants.DART_FONT, 20))
                 avgLabel.grid(row=statCount, column=2, sticky="w")
                 self.averageScores[column].append(averageScore)
                 
             column += 1
 
 def globalShortcut():
-    AskFrame(["Wie viele Spieler?"], root, initMenuCb)    
+    AskFrame(["Wie viele Spieler?", "Legs für Satzgewinn?"], root, initMenuCb)    
 
-def newGame(nPLayers, names=[], load=False):
+def newGame(nPLayers, legs, names=[], load=False):
     global app
     #game = Game(["Natalie", "Andre"])
     try:
@@ -400,17 +445,18 @@ def newGame(nPLayers, names=[], load=False):
 
     game = None
     if load:
-        game = load_object("autosave.dat")
+        if exists("autosave.dat"):
+            game = load_object("autosave.dat")
 
     if game == None:
         players = []
         for i in range(0, nPLayers):
-            players.append("Spieler{}".format(i))
+            players.append("{}".format(dartConstants.SPIELER[i]))
 
         if len(names) > 0:
-            game = Game(names)
+            game = Game(names, nLegs=legs)
         else:
-            game = Game(players)
+            game = Game(players, nLegs=legs)
     
     app = GameFrame(game)
     root.unbind("<KeyPress>")
@@ -420,17 +466,25 @@ def initMenuCb(char):
     
     if True == char[0].isdigit():
         nPlayers = int(char[0])
+
+        nLegs = 3
+        if True == char[1].isdigit():
+            nLegs = int(char[1])
+        
+        if nLegs < 1:
+            nLegs = 3
+
         if 0 < nPlayers and 5 > nPlayers:
-            newGame(nPlayers);
+            newGame(nPlayers, nLegs)
 
 
 def cycle():
-    #while not q.empty():
-    #    text = q.get()
-    #    newGame(4, json.loads(text))
-    # print (root.focus_get())
 
-    if root.focus_get() == None or not hasattr(root.focus_get(),"igw"):
+    global app
+
+    app.grabFocus()
+
+    if MenuFrame.instance == False and AskFrame.instance == False and (root.focus_get() == None or not hasattr(root.focus_get(),"igw")):
         root.lift()
         root.attributes("-topmost", True)
         root.focus_force()
@@ -439,7 +493,6 @@ def cycle():
         if platform.system() == "Linux":
             os.system('./takeFocus')
         app.setCurrentFocus(0)
-
    
     root.after(2000, cycle)
 
